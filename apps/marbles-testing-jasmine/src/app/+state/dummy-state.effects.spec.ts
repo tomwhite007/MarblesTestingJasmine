@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { Observable, of, throwError } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { EffectsModule } from '@ngrx/effects';
 import { StoreModule, Action } from '@ngrx/store';
@@ -22,20 +22,10 @@ describe('DummyStateEffects', () => {
   let effects: DummyStateEffects;
   const dummyApiError = new Error('Oops! Api request failed');
   let apiSpy;
-  let returnCounter = 0;
-
-  beforeAll(() => {
-    apiSpy = jasmine.createSpyObj('FakeRestService', ['getDummyData']);
-    apiSpy.getDummyData.and.callFake(() => {
-      if (returnCounter === 0) {
-        returnCounter++;
-        return of(['Mocked']);
-      }
-      return throwError(dummyApiError);
-    });
-  });
 
   beforeEach(() => {
+    apiSpy = jasmine.createSpyObj('FakeRestService', ['getDummyData']);
+
     TestBed.configureTestingModule({
       imports: [
         NxModule.forRoot(),
@@ -59,7 +49,9 @@ describe('DummyStateEffects', () => {
       expect(actual).toEqual(expected);
     });
 
-    testScheduler.run(({ hot, expectObservable }) => {
+    testScheduler.run(({ hot, cold, expectObservable }) => {
+      apiSpy.getDummyData.and.returnValue(cold('(a|)', { a: ['Mocked'] }));
+
       actions$ = hot('-a-|', { a: new LoadDummyState() });
 
       expectObservable(effects.loadDummyState$).toBe('-a-|', {
@@ -75,10 +67,12 @@ describe('DummyStateEffects', () => {
       expect(actual).toEqual(expected);
     });
 
-    testScheduler.run(({ hot, expectObservable }) => {
+    testScheduler.run(({ hot, cold, expectObservable }) => {
+      apiSpy.getDummyData.and.returnValue(cold('#', null, dummyApiError));
+
       actions$ = hot('-a-|', { a: new LoadDummyState() });
 
-      expectObservable(effects.loadDummyState$).toBe('(a|)', {
+      expectObservable(effects.loadDummyState$).toBe('-(a|)', {
         a: new DummyStateLoadError(dummyApiError)
       });
     });
